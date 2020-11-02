@@ -41,6 +41,8 @@ type Layer struct {
 }
 
 type ImageConfig struct {
+	ID           string `json:id`
+	Parent       string `json:parent`
 	Architecture string `json:"architecture"`
 	Config       struct {
 		Hostname     string   `json:"Hostname"`
@@ -115,6 +117,7 @@ type ContentManifest struct {
 
 type LayerJson struct {
 	ID              string    `json:id`
+	Parent          string    `json:parent`
 	Created         time.Time `json:"created"`
 	ContainerConfig struct {
 		Hostname     string      `json:"Hostname"`

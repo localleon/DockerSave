@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"time"
 )
 
 var authService string = "registry.docker.io"
@@ -24,18 +25,22 @@ func main() {
 	image := "alpine/git"
 	tag := "latest"
 	authScope := "repository:" + image + ":pull"
+	out := "alpine.tar"
+
+	fmt.Println("Downloading " + image + ":" + tag)
 
 	// Get Authentication Token for authScope
-	fmt.Println("Getting Authenticaton Token")
+	fmt.Println("Getting Authenticaton Token for " + authService)
 	authResult = getAuthToken(authService, authScope)
 
 	// Getting Information
-	fmt.Println("Retrieving Information about Container Image")
+	fmt.Println("Retrieving Information about Container Image on " + registryURL)
 	infos := getManifestInfos(image, tag)
 	amd64 := infos.Manifests[0]
 
 	// Download Manifest
 	fmt.Println("Downloading Manifest Files")
+	fmt.Println("----------------------------------------------------")
 	manifest := downloadManifest(image, amd64.Digest)
 	// writeManifestToFile(manifest, "./golayer/manifest.json")
 
@@ -57,25 +62,105 @@ func main() {
 	contentManifest.RepoTags = []string{image + ":" + tag}
 
 	// Build Layers
-	var parentID string
+	v := ""
+	var parentID *string
+	parentID = &v
 
-	l := manifest.Layers[0]
-	blob := l.Digest
-	// Create first Layer Folder
-	fakeLayerID := generateFakeID(parentID, blob)
-	_ = os.Mkdir("./golayer/"+fakeLayerID, 0777)
-	downloadLayerBlob(image, blob, fakeLayerID)
+	for i, l := range manifest.Layers {
+		blob := l.Digest
+		fmt.Println("Pulling Layer Blob: ", blob[7:30])
 
-	// Create Version File
-	f, err := os.Create("./golayer/" + fakeLayerID + "/VERSION")
-	f.Write([]byte("1.0"))
-	f.Close()
+		// Create first Layer Folder#
+		fakeLayerID := generateFakeID(*parentID, blob)
+		_ = os.Mkdir("./golayer/"+fakeLayerID, 0777)
+		downloadLayerBlob(image, blob, fakeLayerID)
 
-	// Create JSON File for Layer
-	var json LayerJson
-	json.Created = config.Created // Set Creation date
-	json.ID = fakeLayerID
+		// Create Version File
+		f, _ := os.Create("./golayer/" + fakeLayerID + "/VERSION")
+		f.Write([]byte("1.0"))
+		f.Close()
 
+		// Append Layer ID to Manifest File
+		contentManifest.Layers = append(contentManifest.Layers, fakeLayerID)
+
+		// Create JSON File for Layer (from emptyJson)
+
+		if len(manifest.Layers)-1 == i { // Check if it's the last Layer
+			createJSONLastLayerFile(parentID, fakeLayerID, config)
+		} else {
+			createJSONLayerFile(parentID, fakeLayerID, config)
+		}
+	}
+
+	// Write Image Content Manifest to File
+	contentFile, _ := json.MarshalIndent(contentManifest, "", " ")
+	_ = ioutil.WriteFile("./golayer/manifest.json", contentFile, 0644)
+
+	// Create Repo File
+	createRepoFile(image, *parentID)
+	fmt.Println("\n \nFinished pulling " + image + ":" + tag)
+	fmt.Println(out)
+	// Create archive
+	// fmt.Println("Creating Tarball out of layers.....")
+	// err2 := Tar("golayer", "./")
+	// if err != nil {
+	// 	fmt.Println(err2.Error())
+	// }
+	// os.RemoveAll("./golayer/")
+	// os.Rename("./golayer.tar", out)
+}
+
+func createJSONLastLayerFile(parentID *string, fakeLayerID string, c ImageConfig) {
+	// delete history object in it
+	c.History = []struct {
+		Created    time.Time "json:\"created\""
+		CreatedBy  string    "json:\"created_by\""
+		EmptyLayer bool      "json:\"empty_layer,omitempty\""
+	}{}
+	// delte rootfs object
+	c.Rootfs = struct {
+		Type    string   "json:\"type\""
+		DiffIds []string "json:\"diff_ids\""
+	}{}
+	// set ID
+	c.ID = fakeLayerID
+	// set parentID
+	c.Parent = *parentID
+	*parentID = fakeLayerID
+	// Write JSON to file
+	jsonFile, _ := json.MarshalIndent(c, "", " ")
+	err := ioutil.WriteFile("./golayer/"+fakeLayerID+"/json", jsonFile, 0777)
+	if err != nil {
+		println(err.Error())
+	}
+}
+
+// BUg parentID is not set
+func createJSONLayerFile(parentID *string, fakeLayerID string, c ImageConfig) {
+	var jsonData LayerJson
+	jsonData.Created = c.Created // Set Creation date
+	jsonData.ID = fakeLayerID
+	if *parentID != "" {
+		jsonData.Parent = *parentID // set reference to last object
+	}
+	*parentID = fakeLayerID // set current ID for next iteration process
+	// Write JSON to file
+	jsonFile, _ := json.MarshalIndent(jsonData, "", " ")
+	err := ioutil.WriteFile("./golayer/"+fakeLayerID+"/json", jsonFile, 0777)
+	if err != nil {
+		println(err.Error())
+	}
+}
+
+func createRepoFile(image, digest string) {
+	// Write Repository File
+	repo := map[string]interface{}{
+		image: struct {
+			Latest string
+		}{digest},
+	}
+	repoFile, _ := json.MarshalIndent(repo, "", " ")
+	_ = ioutil.WriteFile("./golayer/repositories", repoFile, 0644)
 }
 
 func downloadLayerBlob(image, blob, fakeLayerID string) {
@@ -96,7 +181,6 @@ func downloadLayerBlob(image, blob, fakeLayerID string) {
 
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)
-	fmt.Println(err)
 }
 
 func generateFakeID(id, b string) string {
