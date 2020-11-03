@@ -96,25 +96,30 @@ func downloadImage() {
 	contentManifest.RepoTags = []string{imgFlag + ":" + tagFlag}
 
 	// Build Layers
-	v := ""
-	var parentID *string
-	parentID = &v
+	v := "" // Create store for parentID values
+	parentID := &v
 
 	for i, l := range manifest.Layers {
 		blob := l.Digest
 		fmt.Println("Pulling Layer Blob: ", blob[7:30])
 
 		// Create first Layer Folder#
-		fakeLayerID := generateFakeID(*parentID, blob)
+		fakeLayerID, idErr := generateFakeID(*parentID, blob)
+		if idErr != nil {
+			fmt.Println("Error while trying to generate fakeID")
+		}
 		_ = os.Mkdir("./golayer/"+fakeLayerID, 0777)
 		layErr := downloadLayerBlob(imgFlag, blob, fakeLayerID)
 		if layErr != nil {
-			fmt.Println("Error while downloading Layer Blob. Aborting.... ErrMsg: ", layErr.Error())
+			fmt.Println("Error while downloading Layer Blob.ErrMsg: ", layErr.Error())
 		}
 
 		// Create Version File
 		f, _ := os.Create("./golayer/" + fakeLayerID + "/VERSION")
-		f.Write([]byte("1.0"))
+		_, fErr := f.Write([]byte("1.0"))
+		if fErr != nil {
+			fmt.Println("Error while writing version file for current layer.", fErr.Error())
+		}
 		f.Close()
 
 		// Append Layer ID to Manifest File
@@ -202,12 +207,15 @@ func createRepoFile(image, digest string) {
 
 func downloadLayerBlob(image, blob, fakeLayerID string) error {
 	uri := registryURL + "/v2/" + image + "/blobs/" + blob
-	reqInfo, err := http.NewRequest("GET", uri, nil)
+	reqInfo, httpErr := http.NewRequest("GET", uri, nil)
+	if httpErr != nil {
+		fmt.Println("Error while trying to create Request for Blob Download", httpErr.Error())
+	}
 	reqInfo.Header.Add("Authorization", "Bearer "+authResult.Token)
 	reqInfo.Header.Add("Accept", "application/vnd.docker.distribution.manifest.list.v2+json")
-	resp, err := api.Do(reqInfo)
-	if err != nil {
-		fmt.Println(err)
+	resp, reqErr := api.Do(reqInfo)
+	if reqErr != nil {
+		fmt.Println("Error while trying to performe layer blob download request: ", reqErr.Error())
 	}
 
 	out, err := os.Create("./golayer/" + fakeLayerID + "/layer.tar")
@@ -224,17 +232,23 @@ func downloadLayerBlob(image, blob, fakeLayerID string) error {
 	return nil
 }
 
-func generateFakeID(id, b string) string {
+func generateFakeID(id, b string) (string, error) {
 	s := id + "\n" + b + "\n"
 	h := hmac.New(sha256.New, []byte("secret"))
-	h.Write([]byte(s))
+	_, hErr := h.Write([]byte(s))
+	if hErr != nil {
+		return "", hErr
+	}
 
-	return hex.EncodeToString(h.Sum(nil))
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 func downloadConfig(image, digest string) (ImageConfig, error) {
 	uri := registryURL + "/v2/" + image + "/blobs/" + digest
-	reqInfo, err := http.NewRequest("GET", uri, nil)
+	reqInfo, httpErr := http.NewRequest("GET", uri, nil)
+	if httpErr != nil {
+		fmt.Println("Error while trying to create Request for Config Download", httpErr.Error())
+	}
 	reqInfo.Header.Add("Authorization", "Bearer "+authResult.Token)
 	reqInfo.Header.Add("Accept", "application/vnd.docker.distribution.manifest.list.v2+json")
 	resp, err := api.Do(reqInfo)
@@ -252,7 +266,10 @@ func downloadConfig(image, digest string) (ImageConfig, error) {
 // downloadManifest gets the manifest for a given image and plattform digest
 func downloadManifest(image, digest string) Manifest {
 	uri := registryURL + "/v2/" + image + "/manifests/" + digest
-	reqInfo, err := http.NewRequest("GET", uri, nil)
+	reqInfo, httpErr := http.NewRequest("GET", uri, nil)
+	if httpErr != nil {
+		fmt.Println("Error while trying to create Request for Blob Download", httpErr.Error())
+	}
 	reqInfo.Header.Add("Authorization", "Bearer "+authResult.Token)
 	reqInfo.Header.Add("Accept", "application/vnd.docker.distribution.manifest.list.v2+json")
 	resp, err := api.Do(reqInfo)
@@ -260,14 +277,20 @@ func downloadManifest(image, digest string) Manifest {
 		fmt.Println(err)
 	}
 	var result Manifest
-	json.NewDecoder(resp.Body).Decode(&result)
+	jsErr := json.NewDecoder(resp.Body).Decode(&result)
+	if jsErr != nil {
+		fmt.Println("Error while trying to decode response json from API in downloadManifest()")
+	}
 	return result
 }
 
 func getManifestInfos(image, tag string) ManifestInfo {
 	// Get Download Infos about blob storage
 	uri := registryURL + "/v2/" + image + "/manifests/" + tag
-	reqInfo, err := http.NewRequest("GET", uri, nil)
+	reqInfo, httpErr := http.NewRequest("GET", uri, nil)
+	if httpErr != nil {
+		fmt.Println("Error while trying to create Request for Manifest Info Download", httpErr.Error())
+	}
 	reqInfo.Header.Add("Authorization", "Bearer "+authResult.Token)
 	reqInfo.Header.Add("Accept", "application/vnd.docker.distribution.manifest.list.v2+json")
 	resp, err := api.Do(reqInfo)
@@ -276,7 +299,10 @@ func getManifestInfos(image, tag string) ManifestInfo {
 	}
 	// Decode Manifest infos
 	var result ManifestInfo
-	json.NewDecoder(resp.Body).Decode(&result)
+	jsErr := json.NewDecoder(resp.Body).Decode(&result)
+	if jsErr != nil {
+		fmt.Println("Error while trying to decode response json from API in getManifestInfos()")
+	}
 	return result
 }
 
@@ -288,6 +314,9 @@ func getAuthToken(service, scope string) AuthToken {
 	}
 
 	var result AuthToken
-	json.NewDecoder(resp.Body).Decode(&result)
+	jsErr := json.NewDecoder(resp.Body).Decode(&result)
+	if jsErr != nil {
+		fmt.Println("Error while trying to decode response json from API in getAuthToken()")
+	}
 	return result
 }
