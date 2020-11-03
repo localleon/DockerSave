@@ -38,7 +38,20 @@ func main() {
 		fmt.Println("Invalid Input. Please check your values. Aborting...")
 		return
 	}
+	// Download Docker Image
+	downloadImage()
 
+	// Create archive out of docker layers
+	fmt.Println("Creating Tarball out of layers.....")
+	tarErr := Tar("golayer", "image.tar")
+	if tarErr != nil {
+		fmt.Println(tarErr.Error())
+	}
+	// Cleanup
+	os.RemoveAll("golayer/")
+}
+
+func downloadImage() {
 	// Define default values for image download
 	authScope := "repository:" + imgFlag + ":pull"
 	fmt.Println("Downloading " + imgFlag + ":" + tagFlag)
@@ -60,7 +73,7 @@ func main() {
 	// Create Image Folder
 	err := os.Mkdir("./golayer/", 0777)
 	if err != nil {
-		fmt.Printf(err.Error())
+		fmt.Println("Tmp Dir ./golayer/ already exists. Seems like the tool didn't terminate properly. Please delete manually or rerun", err.Error())
 	}
 
 	// Downloading Config Json
@@ -122,15 +135,6 @@ func main() {
 	// Create Repo File
 	createRepoFile(imgFlag, *parentID)
 	fmt.Println("\n \nFinished pulling " + imgFlag + ":" + tagFlag)
-	// Create archive
-
-	fmt.Println("Creating Tarball out of layers.....")
-	tarErr := Tar("golayer", "image.tar")
-	if tarErr != nil {
-		fmt.Println(tarErr.Error())
-	}
-	// Cleanup
-	os.RemoveAll("golayer/")
 }
 
 //checkValidInput tests if the input is not empty and contains the repository dash
