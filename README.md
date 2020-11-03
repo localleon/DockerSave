@@ -1,4 +1,4 @@
-# WIP: DockerSave
+# DockerSave - Download Containers from DockerHub
 Download Container-Images from DockerHub without the Docker Toolchain. DockerSave is a simple binary without any bullshit. 
 It uses the offical Docker Registry API (v2) to download each layer individually and compress it into a full fledged image. 
 
