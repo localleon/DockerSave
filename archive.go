@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/tar"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 
 //Tar creates an .tar archive out of its input source directory. Used for creating the final image file out of the multiple layers
 func Tar(source, target string) error {
-	fmt.Println(target)
 	tarfile, err := os.Create(target)
 	if err != nil {
 		return err

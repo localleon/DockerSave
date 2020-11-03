@@ -24,10 +24,12 @@ var api *http.Client
 var authResult AuthToken
 var imgFlag string
 var tagFlag string
+var outFlag string
 
 func init() {
 	flag.StringVar(&imgFlag, "image", "", "Specify the image to download. exp: alpine/git")
 	flag.StringVar(&tagFlag, "tag", "", "Specify the tag to download. exp: latest or 1.7.1")
+	flag.StringVar(&outFlag, "out", "dockersave.tar", "Specify the tag to download. exp: latest or 1.7.1")
 	flag.Parse()
 }
 
@@ -43,7 +45,7 @@ func main() {
 
 	// Create archive out of docker layers
 	fmt.Println("Creating Tarball out of layers.....")
-	tarErr := Tar("golayer", "image.tar")
+	tarErr := Tar("golayer", outFlag)
 	if tarErr != nil {
 		fmt.Println(tarErr.Error())
 	}
@@ -141,7 +143,8 @@ func downloadImage() {
 func checkValidInput() bool {
 	chk1 := imgFlag != "" && strings.Contains(imgFlag, "/")
 	chk2 := tagFlag != ""
-	return chk1 && chk2
+	chk3 := strings.Contains(outFlag, ".tar") // Check if file ending is correct
+	return chk1 && chk2 && chk3
 }
 
 func createJSONLastLayerFile(parentID *string, fakeLayerID string, c ImageConfig) {

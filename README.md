@@ -5,7 +5,7 @@ It uses the offical Docker Registry API (v2) to download each layer individually
 The tool currently only supports `hub.docker.com`. PR's for support for more registries are welcome. Files are getting downloaded into a tmp-Folder (./golayer/) in your current working directory, so make sure you got write access to your directory. After the tool has finished it leaves a .tar file in your directory which contains the image
 ## Usage
 ```
-dockersave -image alpine/git -tag latest
+dockersave -image alpine/git -tag latest --out alpine.tar
 ```
 This will save the image `alpine/git` into a tar file. Now copy the tar file onto your docker host.
 Load the file with `docker load --input ./imagefile.tar` or `podman load --input ./imagefile.tar`
