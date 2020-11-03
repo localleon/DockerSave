@@ -81,7 +81,7 @@ func main() {
 		f.Close()
 
 		// Append Layer ID to Manifest File
-		contentManifest.Layers = append(contentManifest.Layers, fakeLayerID)
+		contentManifest.Layers = append(contentManifest.Layers, fakeLayerID+"/layer.tar")
 
 		// Create JSON File for Layer (from emptyJson)
 
@@ -93,21 +93,22 @@ func main() {
 	}
 
 	// Write Image Content Manifest to File
-	contentFile, _ := json.MarshalIndent(contentManifest, "", " ")
+	contentData := make([]ContentManifest, 1)
+	contentData[0] = contentManifest
+	contentFile, _ := json.MarshalIndent(contentData, "", " ")
 	_ = ioutil.WriteFile("./golayer/manifest.json", contentFile, 0644)
 
 	// Create Repo File
 	createRepoFile(image, *parentID)
 	fmt.Println("\n \nFinished pulling " + image + ":" + tag)
-	fmt.Println(out)
 	// Create archive
 	// fmt.Println("Creating Tarball out of layers.....")
 	// err2 := Tar("golayer", "./")
 	// if err != nil {
 	// 	fmt.Println(err2.Error())
 	// }
-	// os.RemoveAll("./golayer/")
-	// os.Rename("./golayer.tar", out)
+	// // os.RemoveAll("golayer/")
+	// os.Rename("golayer.tar", out)
 }
 
 func createJSONLastLayerFile(parentID *string, fakeLayerID string, c ImageConfig) {
@@ -156,7 +157,7 @@ func createRepoFile(image, digest string) {
 	// Write Repository File
 	repo := map[string]interface{}{
 		image: struct {
-			Latest string
+			Latest string `json:"latest"`
 		}{digest},
 	}
 	repoFile, _ := json.MarshalIndent(repo, "", " ")

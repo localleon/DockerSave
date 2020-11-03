@@ -3,8 +3,8 @@ package main
 import "time"
 
 type AuthToken struct {
-	Token       string `json:token`
-	AccessToken string `json:access_token`
+	Token       string `json:"token"`
+	AccessToken string `json:"access_token"`
 	ExpiresIn   int    `json:"expires_in"`
 	IssuedAt    int    `json:"issued_at"`
 }
@@ -41,8 +41,8 @@ type Layer struct {
 }
 
 type ImageConfig struct {
-	ID           string `json:id`
-	Parent       string `json:parent`
+	ID           string `json:"id"`
+	Parent       string `json:"parent"`
 	Architecture string `json:"architecture"`
 	Config       struct {
 		Hostname     string   `json:"Hostname"`
@@ -111,13 +111,13 @@ type ImageConfig struct {
 
 type ContentManifest struct {
 	Config   string   `json:"Config"`
-	RepoTags []string `json:RepoTags`
-	Layers   []string `json:Layers`
+	RepoTags []string `json:"RepoTags"`
+	Layers   []string `json:"Layers"`
 }
 
 type LayerJson struct {
-	ID              string    `json:id`
-	Parent          string    `json:parent`
+	ID              string    `json:"id"`
+	Parent          string    `json:"parent"`
 	Created         time.Time `json:"created"`
 	ContainerConfig struct {
 		Hostname     string      `json:"Hostname"`

@@ -1,4 +1,5 @@
-./test/*
-./golayer/*
-./compare/*
-./*.tar
+test/*
+golayer/*
+compare/*
+*.tar
+
