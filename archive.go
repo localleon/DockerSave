@@ -2,16 +2,14 @@ package main
 
 import (
 	"archive/tar"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
+//Tar creates an .tar archive out of its input source directory. Used for creating the final image file out of the multiple layers
 func Tar(source, target string) error {
-	filename := filepath.Base(source)
-	target = filepath.Join(target, fmt.Sprintf("%s.tar", filename))
 	tarfile, err := os.Create(target)
 	if err != nil {
 		return err
@@ -21,15 +19,7 @@ func Tar(source, target string) error {
 	tarball := tar.NewWriter(tarfile)
 	defer tarball.Close()
 
-	info, err := os.Stat(source)
-	if err != nil {
-		return nil
-	}
-
-	var baseDir string
-	if info.IsDir() {
-		baseDir = filepath.Base(source) // always put the layers on the top level of the directory
-	}
+	baseDir := "./" // set top level directory to relativ path so we dont need a sub-directory
 
 	return filepath.Walk(source,
 		func(path string, info os.FileInfo, err error) error {
@@ -41,9 +31,8 @@ func Tar(source, target string) error {
 				return err
 			}
 
-			if baseDir != "" {
-				header.Name = filepath.Join(baseDir, strings.TrimPrefix(path, source))
-			}
+			// Rewrite Header so we have a relative path that doesn't include ./golayer/S
+			header.Name = filepath.Join(baseDir, strings.TrimPrefix(path, source))
 
 			if err := tarball.WriteHeader(header); err != nil {
 				return err
