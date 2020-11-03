@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -27,10 +28,16 @@ var tagFlag string
 func init() {
 	flag.StringVar(&imgFlag, "image", "", "Specify the image to download. exp: alpine/git")
 	flag.StringVar(&tagFlag, "tag", "", "Specify the tag to download. exp: latest or 1.7.1")
+	flag.Parse()
 }
 
 func main() {
 	api = &http.Client{}
+
+	if !checkValidInput() {
+		fmt.Println("Invalid Input. Please check your values. Aborting...")
+		return
+	}
 
 	// Define default values for image download
 	authScope := "repository:" + imgFlag + ":pull"
@@ -117,13 +124,20 @@ func main() {
 	fmt.Println("\n \nFinished pulling " + imgFlag + ":" + tagFlag)
 	// Create archive
 
-	// fmt.Println("Creating Tarball out of layers.....")
-	// err2 := Tar("golayer", "./")
-	// if err != nil {
-	// 	fmt.Println(err2.Error())
-	// }
-	// // os.RemoveAll("golayer/")
-	// os.Rename("golayer.tar", out)
+	fmt.Println("Creating Tarball out of layers.....")
+	tarErr := Tar("golayer", "image.tar")
+	if tarErr != nil {
+		fmt.Println(tarErr.Error())
+	}
+	// Cleanup
+	os.RemoveAll("golayer/")
+}
+
+//checkValidInput tests if the input is not empty and contains the repository dash
+func checkValidInput() bool {
+	chk1 := imgFlag != "" && strings.Contains(imgFlag, "/")
+	chk2 := tagFlag != ""
+	return chk1 && chk2
 }
 
 func createJSONLastLayerFile(parentID *string, fakeLayerID string, c ImageConfig) {
