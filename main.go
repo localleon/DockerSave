@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,21 +14,27 @@ import (
 	"time"
 )
 
+// We currently only support dockerhub
 var authService string = "registry.docker.io"
 var registryURL string = "https://registry-1.docker.io"
+
+// Global Vars
 var api *http.Client
 var authResult AuthToken
+var imgFlag string
+var tagFlag string
+
+func init() {
+	flag.StringVar(&imgFlag, "image", "", "Specify the image to download. exp: alpine/git")
+	flag.StringVar(&tagFlag, "tag", "", "Specify the tag to download. exp: latest or 1.7.1")
+}
 
 func main() {
 	api = &http.Client{}
 
 	// Define default values for image download
-	image := "alpine/git"
-	tag := "latest"
-	authScope := "repository:" + image + ":pull"
-	// out := "alpine.tar"
-
-	fmt.Println("Downloading " + image + ":" + tag)
+	authScope := "repository:" + imgFlag + ":pull"
+	fmt.Println("Downloading " + imgFlag + ":" + tagFlag)
 
 	// Get Authentication Token for authScope
 	fmt.Println("Getting Authenticaton Token for " + authService)
@@ -35,14 +42,13 @@ func main() {
 
 	// Getting Information
 	fmt.Println("Retrieving Information about Container Image on " + registryURL)
-	infos := getManifestInfos(image, tag)
+	infos := getManifestInfos(imgFlag, tagFlag)
 	amd64 := infos.Manifests[0]
 
 	// Download Manifest
 	fmt.Println("Downloading Manifest Files")
 	fmt.Println("----------------------------------------------------")
-	manifest := downloadManifest(image, amd64.Digest)
-	// writeManifestToFile(manifest, "./golayer/manifest.json")
+	manifest := downloadManifest(imgFlag, amd64.Digest)
 
 	// Create Image Folder
 	err := os.Mkdir("./golayer/", 0777)
@@ -51,15 +57,21 @@ func main() {
 	}
 
 	// Downloading Config Json
-	config := downloadConfig(image, manifest.Config.Digest)
+	config, cfgErr := downloadConfig(imgFlag, manifest.Config.Digest)
+	if cfgErr != nil {
+		fmt.Println("Error while downloading Config.JSON. Aborting... ErrMsg:", cfgErr.Error())
+	}
 	configFile, _ := json.MarshalIndent(config, "", " ")
 	configFileName := manifest.Config.Digest[7:] + ".json"
-	_ = ioutil.WriteFile("./golayer/"+configFileName, configFile, 0644)
+	cfgFErr := ioutil.WriteFile("./golayer/"+configFileName, configFile, 0644)
+	if cfgFErr != nil {
+		fmt.Println("Cant write config.json. Aborting.... ErrMSG: ", cfgFErr.Error())
+	}
 
 	// Build Content Manifest File
 	var contentManifest ContentManifest
 	contentManifest.Config = configFileName
-	contentManifest.RepoTags = []string{image + ":" + tag}
+	contentManifest.RepoTags = []string{imgFlag + ":" + tagFlag}
 
 	// Build Layers
 	v := ""
@@ -73,7 +85,10 @@ func main() {
 		// Create first Layer Folder#
 		fakeLayerID := generateFakeID(*parentID, blob)
 		_ = os.Mkdir("./golayer/"+fakeLayerID, 0777)
-		downloadLayerBlob(image, blob, fakeLayerID)
+		layErr := downloadLayerBlob(imgFlag, blob, fakeLayerID)
+		if layErr != nil {
+			fmt.Println("Error while downloading Layer Blob. Aborting.... ErrMsg: ", layErr.Error())
+		}
 
 		// Create Version File
 		f, _ := os.Create("./golayer/" + fakeLayerID + "/VERSION")
@@ -84,7 +99,6 @@ func main() {
 		contentManifest.Layers = append(contentManifest.Layers, fakeLayerID+"/layer.tar")
 
 		// Create JSON File for Layer (from emptyJson)
-
 		if len(manifest.Layers)-1 == i { // Check if it's the last Layer
 			createJSONLastLayerFile(parentID, fakeLayerID, config)
 		} else {
@@ -99,9 +113,10 @@ func main() {
 	_ = ioutil.WriteFile("./golayer/manifest.json", contentFile, 0644)
 
 	// Create Repo File
-	createRepoFile(image, *parentID)
-	fmt.Println("\n \nFinished pulling " + image + ":" + tag)
+	createRepoFile(imgFlag, *parentID)
+	fmt.Println("\n \nFinished pulling " + imgFlag + ":" + tagFlag)
 	// Create archive
+
 	// fmt.Println("Creating Tarball out of layers.....")
 	// err2 := Tar("golayer", "./")
 	// if err != nil {
@@ -138,7 +153,7 @@ func createJSONLastLayerFile(parentID *string, fakeLayerID string, c ImageConfig
 
 // BUg parentID is not set
 func createJSONLayerFile(parentID *string, fakeLayerID string, c ImageConfig) {
-	var jsonData LayerJson
+	var jsonData LayerJSON
 	jsonData.Created = c.Created // Set Creation date
 	jsonData.ID = fakeLayerID
 	if *parentID != "" {
@@ -164,7 +179,7 @@ func createRepoFile(image, digest string) {
 	_ = ioutil.WriteFile("./golayer/repositories", repoFile, 0644)
 }
 
-func downloadLayerBlob(image, blob, fakeLayerID string) {
+func downloadLayerBlob(image, blob, fakeLayerID string) error {
 	uri := registryURL + "/v2/" + image + "/blobs/" + blob
 	reqInfo, err := http.NewRequest("GET", uri, nil)
 	reqInfo.Header.Add("Authorization", "Bearer "+authResult.Token)
@@ -182,6 +197,10 @@ func downloadLayerBlob(image, blob, fakeLayerID string) {
 
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func generateFakeID(id, b string) string {
@@ -192,7 +211,7 @@ func generateFakeID(id, b string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func downloadConfig(image, digest string) ImageConfig {
+func downloadConfig(image, digest string) (ImageConfig, error) {
 	uri := registryURL + "/v2/" + image + "/blobs/" + digest
 	reqInfo, err := http.NewRequest("GET", uri, nil)
 	reqInfo.Header.Add("Authorization", "Bearer "+authResult.Token)
@@ -202,13 +221,11 @@ func downloadConfig(image, digest string) ImageConfig {
 		fmt.Println(err)
 	}
 	var result ImageConfig
-	json.NewDecoder(resp.Body).Decode(&result)
-	return result
-}
-
-func writeManifestToFile(m Manifest, path string) {
-	maniFile, _ := json.MarshalIndent(m, "", " ")
-	_ = ioutil.WriteFile(path, maniFile, 0644)
+	jsonErr := json.NewDecoder(resp.Body).Decode(&result)
+	if jsonErr != nil {
+		return ImageConfig{}, jsonErr
+	}
+	return result, nil
 }
 
 // downloadManifest gets the manifest for a given image and plattform digest

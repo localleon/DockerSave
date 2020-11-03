@@ -2,6 +2,7 @@ package main
 
 import "time"
 
+//AuthToken stores the authentication context of the API
 type AuthToken struct {
 	Token       string `json:"token"`
 	AccessToken string `json:"access_token"`
@@ -9,6 +10,7 @@ type AuthToken struct {
 	IssuedAt    int    `json:"issued_at"`
 }
 
+//ManifestInfo descripbes the Manifest of the Repository Repo. Here you find all available target platforms
 type ManifestInfo struct {
 	SchemaVersion int    `json:"schemaVersion"`
 	MediaType     string `json:"mediaType"`
@@ -23,6 +25,7 @@ type ManifestInfo struct {
 	} `json:"manifests"`
 }
 
+//Manifest defines the DockerHub Repo Manifest on where to find all layer blobs
 type Manifest struct {
 	SchemaVersion int    `json:"schemaVersion"`
 	MediaType     string `json:"mediaType"`
@@ -34,12 +37,14 @@ type Manifest struct {
 	Layers []Layer `json:"layers"`
 }
 
+//Layer describes a dir aka layer in an docker image.
 type Layer struct {
 	MediaType string `json:"mediaType"`
 	Size      int    `json:"size"`
 	Digest    string `json:"digest"`
 }
 
+//ImageConfig defines endpoint an startpoints for an docker image and is written to the config.json file of the container
 type ImageConfig struct {
 	ID           string `json:"id"`
 	Parent       string `json:"parent"`
@@ -109,13 +114,15 @@ type ImageConfig struct {
 	} `json:"rootfs"`
 }
 
+//ContentManifest defines the manifest.json in the Docker Container Image
 type ContentManifest struct {
 	Config   string   `json:"Config"`
 	RepoTags []string `json:"RepoTags"`
 	Layers   []string `json:"Layers"`
 }
 
-type LayerJson struct {
+//LayerJSON describes the "json" file in every layer. Stores information about ID, their parent image and config
+type LayerJSON struct {
 	ID              string    `json:"id"`
 	Parent          string    `json:"parent"`
 	Created         time.Time `json:"created"`

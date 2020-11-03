@@ -9,6 +9,7 @@ import (
 	"strings"
 )
 
+//Tar creates an .tar archive out of its input source directory. Used for creating the final image file out of the multiple layers
 func Tar(source, target string) error {
 	filename := filepath.Base(source)
 	target = filepath.Join(target, fmt.Sprintf("%s.tar", filename))
