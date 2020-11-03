@@ -25,7 +25,7 @@ func main() {
 	image := "alpine/git"
 	tag := "latest"
 	authScope := "repository:" + image + ":pull"
-	out := "alpine.tar"
+	// out := "alpine.tar"
 
 	fmt.Println("Downloading " + image + ":" + tag)
 
